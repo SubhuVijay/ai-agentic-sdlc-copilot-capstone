@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Overdue hold-shelf view and `GET /api/holds/overdue` endpoint for identifying ready holds beyond the pickup window, including waiting-day counts and `Not Found` phone values.
+- Positive-integer pickup-window validation, empty-result handling, retry/error feedback, and acceptance coverage while preserving existing list and pickup behavior.
+
 ## [0.1.0] - 2026-11-17
 
 ### Added

@@ -13,6 +13,9 @@
     th, td { text-align: left; padding: 0.55rem 0.4rem; border-bottom: 1px solid #e7e5e4; }
     th { font-size: 0.8rem; letter-spacing: 0.03em; text-transform: uppercase; color: #78716c; }
     button { font: inherit; padding: 0.3rem 0.7rem; }
+    .controls { display: flex; gap: 0.6rem; align-items: end; margin: 1.5rem 0 0.8rem; }
+    .controls label { display: flex; flex-direction: column; gap: 0.25rem; }
+    .controls input { font: inherit; padding: 0.3rem; width: 7rem; }
     .error { background: #fef2f2; color: #991b1b; padding: 0.7rem 0.8rem; }
     .empty { color: #57534e; }
   </style>
@@ -35,9 +38,35 @@
     <tbody id="holds"></tbody>
   </table>
 
+  <section aria-labelledby="overdue-heading">
+    <h2 id="overdue-heading">Overdue holds</h2>
+    <div class="controls">
+      <label for="overdue-days">Pickup window (days)
+        <input id="overdue-days" type="number" value="7" min="1" step="1">
+      </label>
+      <button id="overdue-action" type="button">Overdue Holds</button>
+    </div>
+    <div id="overdue-message" role="status"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Hold</th>
+          <th>Title</th>
+          <th>Patron</th>
+          <th>Waiting days</th>
+          <th>Phone</th>
+        </tr>
+      </thead>
+      <tbody id="overdue-holds"></tbody>
+    </table>
+  </section>
+
   <script>
     const message = document.getElementById("message");
     const body = document.getElementById("holds");
+    const overdueDays = document.getElementById("overdue-days");
+    const overdueMessage = document.getElementById("overdue-message");
+    const overdueBody = document.getElementById("overdue-holds");
 
     function showError(text) {
       message.className = "error";
@@ -106,6 +135,75 @@
       await loadHolds();
     }
 
+    function clearOverdueRows() {
+      overdueBody.replaceChildren();
+    }
+
+    function showOverdueError(text) {
+      overdueMessage.className = "error";
+      overdueMessage.replaceChildren();
+      const error = document.createTextNode(text + " ");
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.textContent = "Retry";
+      retry.addEventListener("click", loadOverdue);
+      overdueMessage.append(error, retry);
+    }
+
+    function renderOverdue(holds) {
+      clearOverdueRows();
+      if (holds.length === 0) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 5;
+        cell.className = "empty";
+        cell.textContent = "No ready hold is past the pickup window.";
+        row.append(cell);
+        overdueBody.append(row);
+        return;
+      }
+      for (const hold of holds) {
+        const row = document.createElement("tr");
+        for (const value of [
+          hold.id,
+          hold.title,
+          hold.patron,
+          hold.waitingDays + " days",
+          hold.phone == null ? "Not Found" : hold.phone
+        ]) {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.append(cell);
+        }
+        overdueBody.append(row);
+      }
+    }
+
+    async function loadOverdue() {
+      overdueMessage.className = "";
+      overdueMessage.textContent = "";
+      const suppliedDays = overdueDays.value.trim();
+      const days = suppliedDays === "" ? "7" : suppliedDays;
+      if (!/^[0-9]+$/.test(days) || Number(days) <= 0) {
+        clearOverdueRows();
+        showOverdueError("Pickup window must be a positive integer.");
+        return;
+      }
+      clearOverdueRows();
+      try {
+        const response = await fetch("/api/holds/overdue?days=" + encodeURIComponent(days));
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "Could not load overdue holds.");
+        }
+        renderOverdue(payload.holds || []);
+      } catch (error) {
+        clearOverdueRows();
+        showOverdueError(error.message || "Could not load overdue holds.");
+      }
+    }
+
+    document.getElementById("overdue-action").addEventListener("click", loadOverdue);
     loadHolds().catch(() => showError("API unreachable"));
   </script>
 </body>

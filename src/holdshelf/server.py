@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qsl, unquote, urlparse
 
 from holdshelf.catalog import Catalog
+from holdshelf.overdue import select_overdue, validate_days
 
 STATIC = Path(__file__).resolve().parent / "static" / "index.html"
 HOST = "127.0.0.1"
@@ -15,21 +17,43 @@ PORT = 8765
 
 
 class ShelfApp:
-    def __init__(self, catalog: Catalog | None = None) -> None:
+    def __init__(
+        self, catalog: Catalog | None = None, today: date | None = None
+    ) -> None:
         self.catalog = catalog if catalog is not None else Catalog()
+        self._today = today
 
     def handle(self, method: str, target: str) -> tuple[int, object]:
-        path = unquote(urlparse(target).path)
+        parsed_target = urlparse(target)
+        path = unquote(parsed_target.path)
         if method == "GET" and path == "/api/health":
             return 200, {"status": "ok"}
         if method == "GET" and path == "/api/holds":
             return 200, {"holds": self.catalog.list_holds()}
+        if method == "GET" and path == "/api/holds/overdue":
+            return self._overdue(parsed_target.query)
         if method == "POST" and path.startswith("/api/holds/") and path.endswith("/pickup"):
             hold_id = path.removeprefix("/api/holds/").removesuffix("/pickup").strip("/")
             return self._pickup(hold_id)
         if method == "GET" and path == "/":
             return 200, STATIC.read_text(encoding="utf-8")
         return 404, {"error": "That page or hold was not found."}
+
+    def _overdue(self, query: str) -> tuple[int, dict]:
+        days_values = [value for key, value in parse_qsl(
+            query, keep_blank_values=True
+        ) if key == "days"]
+        if len(days_values) > 1:
+            return 400, {"error": "days must be a positive integer"}
+        try:
+            days = validate_days(days_values[0] if days_values else None)
+        except ValueError as error:
+            return 400, {"error": str(error)}
+        return 200, {
+            "holds": select_overdue(
+                self.catalog.list_holds(), days, today=self._today
+            )
+        }
 
     def _pickup(self, hold_id: str) -> tuple[int, dict]:
         if not hold_id:
