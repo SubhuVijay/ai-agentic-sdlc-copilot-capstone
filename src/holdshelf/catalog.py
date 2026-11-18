@@ -10,7 +10,7 @@ class Hold:
     id: str
     title: str
     patron: str
-    ready_since: str
+    ready_since: str | None
     status: str
     phone: str | None = None
 
