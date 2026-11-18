@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "python3 .github/hooks/scripts/sdlc_context.py",
+        "powershell": "python .github/hooks/scripts/sdlc_context.py",
+        "cwd": ".",
+        "timeoutSec": 10
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "python3 .github/hooks/scripts/guard_shell.py",
+        "powershell": "python .github/hooks/scripts/guard_shell.py",
+        "cwd": ".",
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": "python3 .github/hooks/scripts/guard_secrets.py",
+        "powershell": "python .github/hooks/scripts/guard_secrets.py",
+        "cwd": ".",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}
